@@ -242,7 +242,11 @@ export default function WorkersPage() {
                             </button>
                         </div>
 
-                        <form action={editingWorker ? handleUpdate : handleCreate} className="p-6 space-y-4">
+                        <form
+                            key={editingWorker ? `edit-${editingWorker.id}` : 'create'}
+                            action={editingWorker ? handleUpdate : handleCreate}
+                            className="p-6 space-y-4"
+                        >
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
                                 <div className="relative">

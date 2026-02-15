@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
         const dateFilter = searchParams.get('filter') || 'all'
         const startDate = searchParams.get('startDate')
         const endDate = searchParams.get('endDate')
+        const surveyId = searchParams.get('surveyId')
 
         let query = (supabase
             .from('submissions') as any)
@@ -37,6 +38,11 @@ export async function GET(request: NextRequest) {
         worker:users!worker_id(name, mall_name),
         survey:surveys(title)
       `)
+
+        // Apply survey filter
+        if (surveyId && surveyId !== 'all') {
+            query = query.eq('survey_id', surveyId)
+        }
 
         // Apply date filter
         if (dateFilter !== 'all') {
@@ -66,6 +72,22 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: error.message }, { status: 500 })
         }
 
+        // If a specific survey is selected, fetch its questions to create dynamic columns
+        let questionMap: { [id: string]: string } = {}
+        if (surveyId && surveyId !== 'all') {
+            const { data: questions } = await supabase
+                .from('survey_questions')
+                .select('id, question')
+                .eq('survey_id', surveyId)
+                .order('order_index', { ascending: true })
+
+            if (questions) {
+                questions.forEach((q: any) => {
+                    questionMap[q.id] = q.question
+                })
+            }
+        }
+
         // Transform data for export
         const exportData: SubmissionExportData[] = (data || []).map((submission: any) => ({
             id: submission.id,
@@ -75,10 +97,11 @@ export async function GET(request: NextRequest) {
             invoice_number: submission.invoice_number,
             invoice_image_url: submission.invoice_image_url,
             customer_image_url: submission.customer_image_url,
-            worker_name: submission.worker.name,
-            mall_name: submission.worker.mall_name,
-            survey_title: submission.survey.title,
+            worker_name: submission.worker?.name || 'Unknown',
+            mall_name: submission.worker?.mall_name || 'Unknown',
+            survey_title: submission.survey?.title || 'Unknown',
             answers: submission.answers,
+            question_map: Object.keys(questionMap).length > 0 ? questionMap : undefined,
             created_at: submission.created_at,
         }))
 

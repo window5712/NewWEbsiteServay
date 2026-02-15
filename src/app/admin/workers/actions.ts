@@ -77,7 +77,10 @@ export async function updateWorker(userId: string, formData: FormData) {
         // Update auth user
         const { error: authError } = await supabase.auth.admin.updateUserById(
             userId,
-            updates
+            {
+                ...updates,
+                email_confirm: true // Ensure email is confirmed automatically when admin updates it
+            }
         )
 
         if (authError) throw authError
@@ -98,7 +101,7 @@ export async function updateWorker(userId: string, formData: FormData) {
         return { success: true }
     } catch (error: any) {
         console.error('Update worker error:', error)
-        return { error: error.message }
+        return { error: error.message || 'Failed to update worker' }
     }
 }
 
@@ -106,21 +109,36 @@ export async function deleteWorker(userId: string) {
     const supabase = createAdminClient()
 
     try {
-        const { error } = await supabase.auth.admin.deleteUser(userId)
-        if (error) throw error
+        // 1. Delete from public.users first
+        // If ON DELETE SET NULL is set in DB, this will successfully unlink submissions
+        const { error: dbError } = await supabase
+            .from('users')
+            .delete()
+            .eq('id', userId)
 
-        // Also delete from public.users if not cascading (Supabase auth users deletion cascades if FK is set, but public.users -> auth.users usually is manual or managed by DB constraints. 
-        // Our schema `users.id` is PK, not FK to auth.users explicitly in the SQL provided, but typically it maps.
-        // Actually the schema says `id UUID PRIMARY KEY DEFAULT gen_random_uuid()`. 
-        // The trigger inserts `NEW.id` from auth.users.
-        // If we delete from auth.users, we should manually delete from public.users if there is no ON DELETE CASCADE.
+        if (dbError) {
+            console.error('Error deleting from public.users:', dbError)
+            throw new Error(`Database error: ${dbError.message}`)
+        }
 
-        await supabase.from('users').delete().eq('id', userId)
+        // 2. Delete from auth.users
+        const { error: authError } = await supabase.auth.admin.deleteUser(userId)
+
+        if (authError) {
+            // If the user was already deleted from Auth but still existed in our DB (partial state),
+            // we might want to ignore "User not found" errors here.
+            if (authError.message?.includes('User not found')) {
+                console.log('User already deleted from Auth')
+            } else {
+                console.error('Error deleting from auth.users:', authError)
+                throw new Error(`Auth error: ${authError.message}`)
+            }
+        }
 
         revalidatePath('/admin/workers')
         return { success: true }
     } catch (error: any) {
         console.error('Delete worker error:', error)
-        return { error: error.message }
+        return { error: error.message || 'Failed to delete worker' }
     }
 }

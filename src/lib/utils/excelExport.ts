@@ -12,6 +12,7 @@ export interface SubmissionExportData {
     mall_name: string
     survey_title: string
     answers: any
+    question_map?: { [id: string]: string }
     created_at: string
 }
 
@@ -24,8 +25,8 @@ export async function generateExcel(submissions: SubmissionExportData[]): Promis
     const workbook = new ExcelJS.Workbook()
     const worksheet = workbook.addWorksheet('Survey Submissions')
 
-    // Define columns
-    worksheet.columns = [
+    // Define basic columns
+    const columns: any[] = [
         { header: 'Submission ID', key: 'id', width: 15 },
         { header: 'Customer Name', key: 'customer_name', width: 20 },
         { header: 'Customer Phone', key: 'customer_phone', width: 15 },
@@ -34,11 +35,27 @@ export async function generateExcel(submissions: SubmissionExportData[]): Promis
         { header: 'Worker Name', key: 'worker_name', width: 20 },
         { header: 'Mall Name', key: 'mall_name', width: 20 },
         { header: 'Survey Title', key: 'survey_title', width: 25 },
-        { header: 'Answers', key: 'answers', width: 50 },
+    ]
+
+    // Add dynamic question columns if available
+    const questionIds: string[] = []
+    if (submissions.length > 0 && submissions[0].question_map) {
+        const questionMap = submissions[0].question_map
+        Object.entries(questionMap).forEach(([id, text]) => {
+            columns.push({ header: text, key: `q_${id}`, width: 30 })
+            questionIds.push(id)
+        })
+    }
+
+    // Add remaining standard columns
+    columns.push(
+        { header: 'All Answers (JSON)', key: 'answers', width: 50 },
         { header: 'Invoice Image URL', key: 'invoice_image_url', width: 40 },
         { header: 'Customer Image URL', key: 'customer_image_url', width: 40 },
         { header: 'Submission Date', key: 'created_at', width: 20 },
-    ]
+    )
+
+    worksheet.columns = columns
 
     // Style header row
     worksheet.getRow(1).font = { bold: true }
@@ -51,7 +68,7 @@ export async function generateExcel(submissions: SubmissionExportData[]): Promis
 
     // Add data rows
     submissions.forEach((submission) => {
-        worksheet.addRow({
+        const rowData: any = {
             id: submission.id,
             customer_name: submission.customer_name,
             customer_phone: submission.customer_phone,
@@ -64,7 +81,17 @@ export async function generateExcel(submissions: SubmissionExportData[]): Promis
             invoice_image_url: submission.invoice_image_url,
             customer_image_url: submission.customer_image_url || 'N/A',
             created_at: new Date(submission.created_at).toLocaleString(),
-        })
+        }
+
+        // Fill dynamic question columns
+        if (submission.question_map) {
+            Object.keys(submission.question_map).forEach((qId) => {
+                const answer = submission.answers[qId]
+                rowData[`q_${qId}`] = Array.isArray(answer) ? answer.join(', ') : (answer || '')
+            })
+        }
+
+        worksheet.addRow(rowData)
     })
 
     // Generate buffer

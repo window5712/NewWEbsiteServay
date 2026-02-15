@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 import Select from '@/components/ui/Select'
@@ -12,10 +12,27 @@ export default function ExportPage() {
     const [dateFilter, setDateFilter] = useState('all')
     const [customStartDate, setCustomStartDate] = useState('')
     const [customEndDate, setCustomEndDate] = useState('')
+    const [surveys, setSurveys] = useState<any[]>([])
+    const [filterType, setFilterType] = useState<'all' | 'single'>('all')
+    const [selectedSurveyId, setSelectedSurveyId] = useState('')
     const [isExporting, setIsExporting] = useState(false)
     const [error, setError] = useState('')
     const [success, setSuccess] = useState('')
     const supabase = createClient()
+
+    useEffect(() => {
+        const fetchSurveys = async () => {
+            const { data, error } = await supabase
+                .from('surveys')
+                .select('id, title')
+                .order('title')
+
+            if (data) {
+                setSurveys(data)
+            }
+        }
+        fetchSurveys()
+    }, [supabase])
 
     const handleExport = async () => {
         setError('')
@@ -26,6 +43,9 @@ export default function ExportPage() {
             // Build query parameters
             const params = new URLSearchParams()
             params.append('filter', dateFilter)
+            if (filterType === 'single' && selectedSurveyId) {
+                params.append('surveyId', selectedSurveyId)
+            }
 
             if (dateFilter === 'custom') {
                 if (!customStartDate || !customEndDate) {
@@ -83,6 +103,36 @@ export default function ExportPage() {
                             { value: 'custom', label: 'Custom Range' },
                         ]}
                     />
+
+                    <Select
+                        label="Export Mode"
+                        value={filterType}
+                        onChange={(e) => {
+                            setFilterType(e.target.value as 'all' | 'single')
+                            setError('')
+                            setSuccess('')
+                        }}
+                        options={[
+                            { value: 'all', label: 'All Surveys' },
+                            { value: 'single', label: 'Single Survey' },
+                        ]}
+                    />
+
+                    {filterType === 'single' && (
+                        <Select
+                            label="Select Survey"
+                            value={selectedSurveyId}
+                            onChange={(e) => {
+                                setSelectedSurveyId(e.target.value)
+                                setError('')
+                                setSuccess('')
+                            }}
+                            options={[
+                                { value: '', label: 'Choose a survey...' },
+                                ...surveys.map(s => ({ value: s.id, label: s.title }))
+                            ]}
+                        />
+                    )}
 
                     {dateFilter === 'custom' && (
                         <div className="grid grid-cols-2 gap-4">

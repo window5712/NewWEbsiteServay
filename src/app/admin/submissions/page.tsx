@@ -27,7 +27,7 @@ interface Submission {
     customer_image_url: string | null
     answers: any
     created_at: string
-    worker: { name: string; mall_name: string }
+    worker: { name: string; mall_name: string } | null
     survey: { title: string; id: string }
 }
 
@@ -234,10 +234,10 @@ export default function SubmissionsPage() {
                                             {submission.invoice_number}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {submission.worker.name}
+                                            {submission.worker?.name || 'Deleted User'}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {submission.worker.mall_name}
+                                            {submission.worker?.mall_name || 'N/A'}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             {submission.survey.title}
@@ -339,11 +339,11 @@ export default function SubmissionsPage() {
                                     <div className="space-y-2">
                                         <div className="flex items-center gap-2">
                                             <Users className="w-4 h-4 text-green-600" />
-                                            <span className="text-sm font-medium text-gray-900">{selectedSubmission.worker.name}</span>
+                                            <span className="text-sm font-medium text-gray-900">{selectedSubmission.worker?.name || 'Deleted User'}</span>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <FileText className="w-4 h-4 text-green-600" />
-                                            <span className="text-sm text-gray-700">{selectedSubmission.worker.mall_name}</span>
+                                            <span className="text-sm text-gray-700">{selectedSubmission.worker?.mall_name || 'N/A'}</span>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <FileText className="w-4 h-4 text-green-600" />
