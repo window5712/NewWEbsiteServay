@@ -39,14 +39,17 @@ export default function ImageUpload({ label, required = false, onUploadComplete,
 
         setIsUploading(true)
 
+        // 0. Show local preview immediately
+        const objectUrl = URL.createObjectURL(file)
+        setPreview(objectUrl)
+
         try {
-            // 1. Compress image on client-side
+            // 1. Compress image on client-side (Optional, but keeping for now if it works)
             let fileToUpload: Blob = file;
             try {
                 fileToUpload = await compressImage(file)
             } catch (compressionError) {
                 console.error('Compression failed, uploading original:', compressionError)
-                // Continue with original file if compression fails
             }
 
             // 2. Prepare FormData
@@ -96,7 +99,8 @@ export default function ImageUpload({ label, required = false, onUploadComplete,
 
             const imageUrl = await promise
 
-            // 4. Set preview and notify parent
+            // 4. Update preview with server URL and notify parent
+            URL.revokeObjectURL(objectUrl)
             setPreview(imageUrl)
             onUploadComplete(imageUrl)
 

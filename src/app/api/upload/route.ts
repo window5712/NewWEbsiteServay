@@ -1,15 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
-import path from 'path';
-import fs from 'fs';
-import sharp from 'sharp';
-
-const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
-
-// Ensure upload directory exists
-if (!fs.existsSync(UPLOAD_DIR)) {
-    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-}
+import cloudinary from '@/lib/cloudinary';
 
 export async function POST(req: NextRequest) {
     try {
@@ -22,9 +13,6 @@ export async function POST(req: NextRequest) {
         }
 
         // 2. Parse multipart form data
-        // Next.js App Router req is a Request object, not IncomingMessage.
-        // We need to convert it or use a different approach for App Router.
-        // For App Router, we should use req.formData()
         const formData = await req.formData();
         const file = formData.get('file') as File | null;
 
@@ -43,28 +31,28 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'File size exceeds 5MB limit.' }, { status: 400 });
         }
 
-        // 4. Generate unique filename
-        const buffer = Buffer.from(await file.arrayBuffer());
-        const timestamp = Math.floor(Date.now() / 1000);
-        const randomString = Math.random().toString(36).substring(2, 10);
-        const extension = path.extname(file.name) || '.jpg';
-        const fileName = `${timestamp}_${randomString}${extension}`;
-        const filePath = path.join(UPLOAD_DIR, fileName);
+        // 4. Convert file to base64 for Cloudinary upload
+        const arrayBuffer = await file.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const base64Data = buffer.toString('base64');
+        const fileUri = `data:${file.type};base64,${base64Data}`;
 
-        // 5. Compress and save image
-        await sharp(buffer)
-            .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
-            .toFormat('webp', { quality: 80 })
-            .toFile(path.join(UPLOAD_DIR, fileName.replace(/\.[^.]+$/, '.webp')));
-
-        // Use the .webp filename if we converted it
-        const finalFileName = fileName.replace(/\.[^.]+$/, '.webp');
-        const imageUrl = `/api/images/${finalFileName}`;
+        // 5. Upload to Cloudinary
+        const uploadResponse = await cloudinary.uploader.upload(fileUri, {
+            folder: 'survey-app',
+            resource_type: 'auto',
+            quality: 'auto',
+            fetch_format: 'auto',
+            transformation: [
+                { width: 1920, crop: 'limit' }
+            ]
+        });
 
         return NextResponse.json({
             success: true,
             message: 'Image uploaded successfully',
-            imageUrl: imageUrl
+            imageUrl: uploadResponse.secure_url,
+            publicId: uploadResponse.public_id
         });
 
     } catch (error: any) {

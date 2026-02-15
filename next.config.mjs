@@ -9,6 +9,12 @@ const nextConfig = {
                 pathname: '/storage/v1/object/public/**',
             },
             {
+                protocol: 'https',
+                hostname: 'res.cloudinary.com',
+                port: '',
+                pathname: '/**',
+            },
+            {
                 protocol: 'http',
                 hostname: 'localhost',
                 port: '4000',
